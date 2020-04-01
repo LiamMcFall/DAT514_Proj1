@@ -66,5 +66,46 @@ set.seed(7)
 health.bag <- randomForest(X1 ~ ., data = health,
                         mtry=4,importance =TRUE)
 
+health.bag
+
 importance(health.bag)
 varImpPlot(health.bag)
+
+# Boosting
+
+library(gbm)
+set.seed(7)
+
+health.boost <- gbm(X1 ~ ., data = health, distribution = "gaussian", n.trees = 5000, interaction.depth = 4)
+summary(health.boost)
+
+# Reg subsets
+
+library(leaps)
+health.sub <- regsubsets(X1 ~ poly(X2, 6) + poly(X3, 6) + poly(X4, 6) + poly(X5, 5), data = health, nvmax = 10)
+
+health.sub.sum <- summary(health.sub)
+
+# Ridge
+
+library(glmnet)
+grid <- 10^seq(10,-2,length=100)
+
+xMat <- as.matrix(health[,-1])
+health.ridge <- glmnet(xMat,X1,alpha=0,lambda=grid)
+dim(coef(health.ridge))
+health.ridge$lambda[50]
+coef(health.ridge)[,50]
+
+# Transformations
+
+health <- health %>%
+  mutate(X2.2 = log(X2),
+         X3.2 = log(X3),
+         X4.2 = log(X4),
+         X5.2 = log(X5))
+
+pairs(health)
+
+health.fit <- glm(X1 ~ ., data = health)
+summary(health.fit)
