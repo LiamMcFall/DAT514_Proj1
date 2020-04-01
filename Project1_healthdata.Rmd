@@ -12,8 +12,79 @@ knitr::opts_chunk$set(echo = TRUE)
 Read in data
 
 ```{r}
+library(readxl)
+library(tidyverse)
+library(magrittr)
 
-
+health <- read_xlsx("/Users/liammcfall/Documents/GitHub/DAT514_Proj1/Health.xlsx")
 
 ```
+
+Initial exploration
+
+```{r}
+
+summary(health)
+attach(health)
+pairs(health)
+
+hist(X1)
+hist(X2)
+hist(X3)
+hist(X4)
+hist(X5)
+
+```
+
+
+
+Subset data
+
+```{r}
+set.seed(7)
+train <- sample(nrow(health), nrow(health) * .75)
+health.train <- health[train,]
+health.test <- health[-train,]
+
+```
+
+GLM
+
+```{r}
+
+glm.fit <- glm(X1 ~ ., data = health.train)
+summary(glm.fit)
+training.error <- mean((health.train$X1 - predict(glm.fit, health.train, type = 'response')) ^ 2)
+
+test.error <- mean((health.test$X1 - predict(glm.fit, health.test, type = 'response')) ^ 2)
+
+training.error
+test.error
+
+```
+
+RF
+
+```{r}
+
+library(randomForest)
+set.seed(7)
+bag.fit <- randomForest(X1 ~ X4 + X5, data = health.train,
+                        mtry=1,importance =TRUE)
+
+summary(bag.fit)
+
+training.error <- mean((health.train$X1 - predict(bag.fit, health.train, type = 'response')) ^ 2)
+
+test.error <- mean((health.test$X1 - predict(bag.fit, health.test, type = 'response')) ^ 2)
+
+training.error
+test.error
+
+importance(bag.fit)
+varImpPlot(bag.fit)
+```
+
+
+
 
