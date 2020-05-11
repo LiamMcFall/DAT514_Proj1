@@ -1,0 +1,312 @@
+---
+title: "Project1"
+author: "Liam McFall, Erin Karnath, Cam Farrugia"
+date: "3/31/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Read in Data
+
+```{r}
+
+library(readxl)
+library(tidyverse)
+library(magrittr)
+library(boot)
+library(tree)
+library(leaps)
+library(gbm)
+library(randomForest)
+
+health <- read_xlsx("/Users/rachelpeck/Desktop/LiamSchool/DAT514_Proj1/Health.xlsx")
+
+```
+
+Initial exploration
+
+```{r}
+
+summary(health)
+attach(health)
+pairs(health)
+
+hist(X1)
+hist(X2)
+hist(X3)
+hist(X4)
+hist(X5)
+
+```
+
+Subset data
+
+```{r}
+
+set.seed(7)
+train <- sample(nrow(health), nrow(health) * .75)
+health.train <- health[train,]
+health.test <- health[-train,]
+
+```
+
+I am going to subset the data, but I think that using loocv is the best move. Due to the fact that there are so few observations in the data set relatively speaking, I think that by having every model trained on as many points as possible and then taking the average of the each model's test set (a single observation due to loocv). I think that this should return a lower error than using the random sample subset as the test set.
+
+Linear Model
+
+```{r}
+
+lm.fit <- glm(X1 ~ ., data = health.train)
+summary(lm.fit)
+lm.training.error <- mean((health.train$X1 - predict(lm.fit, health.train, type = 'response')) ^ 2)
+lm.test.error <- mean((health.test$X1 - predict(lm.fit, health.test, type = 'response')) ^ 2)
+
+lm.cv.fit <- glm(X1 ~ ., data = health)
+summary(lm.cv.fit)
+lm.loocv <- cv.glm(health, lm.cv.fit)
+lm.loocv.error <- lm.loocv$delta[1]
+
+lm.training.error
+lm.test.error
+lm.loocv.error
+
+```
+
+Random Forest
+
+```{r}
+
+set.seed(7)
+rf.fit <- randomForest(X1 ~ ., data = health.train,
+                        importance =TRUE)
+rf.training.error <- mean((health.train$X1 - predict(rf.fit, health.train, type = 'response')) ^ 2)
+rf.test.error <- mean((health.test$X1 - predict(rf.fit, health.test, type = 'response')) ^ 2)
+
+rf.cv.fit <- randomForest(X1 ~ ., data = health,
+                        importance =TRUE)
+summary(rf.cv.fit)
+rf.loocv <- cv.glm(health, rf.cv.fit)
+rf.loocv.error <- rf.loocv$delta[1]
+
+rf.training.error
+rf.test.error
+rf.loocv.error
+
+importance(rf.cv.fit)
+varImpPlot(rf.cv.fit)
+
+```
+
+Random Forest 2 ***************************************************** LOWEST TEST MSE**********************************************************
+
+```{r}
+
+set.seed(7)
+rf2.fit <- randomForest(X1 ~ X4 + X5, data = health.train,
+                        importance =TRUE)
+rf2.training.error <- mean((health.train$X1 - predict(rf2.fit, health.train, type = 'response')) ^ 2)
+rf2.test.error <- mean((health.test$X1 - predict(rf2.fit, health.test, type = 'response')) ^ 2)
+
+set.seed(3)
+rf2.cv.fit <- randomForest(X1 ~ X4 + X5, data = health,
+                        importance =TRUE)
+summary(rf2.cv.fit)
+rf2.loocv <- cv.glm(health, rf2.cv.fit)
+rf2.loocv.error <- rf2.loocv$delta[1]
+
+rf2.training.error
+rf2.test.error
+rf2.loocv.error
+
+varImpPlot(rf2.cv.fit)
+
+```
+
+Random Forest 3
+
+```{r}
+
+set.seed(7)
+rf3.fit <- randomForest(X1 ~ X3 + X4 + X5, data = health.train,
+                        importance =TRUE)
+rf3.training.error <- mean((health.train$X1 - predict(rf3.fit, health.train, type = 'response')) ^ 2)
+rf3.test.error <- mean((health.test$X1 - predict(rf3.fit, health.test, type = 'response')) ^ 2)
+
+rf3.cv.fit <- randomForest(X1 ~ X3 + X4 + X5, data = health,
+                        importance =TRUE)
+summary(rf3.cv.fit)
+rf3.loocv <- cv.glm(health, rf3.cv.fit)
+rf3.loocv.error <- rf3.loocv$delta[1]
+
+rf3.training.error
+rf3.test.error
+rf3.loocv.error
+
+```
+
+Bagging
+
+```{r}
+
+set.seed(7)
+bag.fit <- randomForest(X1 ~ ., data = health.train,
+                        mtry=4,importance =TRUE)
+bag.training.error <- mean((health.train$X1 - predict(bag.fit, health.train, type = 'response')) ^ 2)
+bag.test.error <- mean((health.test$X1 - predict(bag.fit, health.test, type = 'response')) ^ 2)
+
+bag.cv.fit <- randomForest(X1 ~ ., data = health,
+                        mtry=4,importance =TRUE)
+summary(bag.cv.fit)
+bag.loocv <- cv.glm(health, bag.cv.fit)
+bag.loocv.error <- bag.loocv$delta[1]
+
+bag.training.error
+bag.test.error
+bag.loocv.error
+
+```
+
+GBM
+
+```{r}
+
+set.seed(7)
+
+gbm.fit <- gbm(
+  formula = X1 ~ .,
+  distribution = "gaussian",
+  data = health,
+  n.trees = 5000,
+  interaction.depth = 1,
+  shrinkage = 0.001,
+  cv.folds = 53,
+  n.cores = NULL,
+  verbose = FALSE
+  )
+
+
+summary(gbm.fit)
+min(gbm.fit$cv.error)
+
+print(gbm.fit)
+
+```
+
+GBM 2
+
+Using X5, X4, X3 as they accounted for 92% of the relative influence in the model.
+
+```{r}
+
+set.seed(7)
+
+gbm.fit <- gbm(
+  formula = X1 ~ X3 + X4 + X5,
+  distribution = "gaussian",
+  data = health,
+  n.trees = 5000,
+  interaction.depth = 1,
+  shrinkage = 0.001,
+  cv.folds = 53,
+  n.cores = NULL,
+  verbose = FALSE
+  )
+
+
+summary(gbm.fit)
+min(gbm.fit$cv.error)
+
+print(gbm.fit)
+
+```
+
+GBM 3
+Adjustment of tuning parameters and LOOCV
+
+```{r}
+
+params <- expand.grid(
+  #shrinkage = c(.0001, .001, .005, .01,.015, .1, .15, .3),
+  shrinkage = c(.2, .215, .225),
+  interaction.depth = c(1, 3, 5),
+  optimal_trees = NA,               
+  min_MSE = NA                     
+)
+
+for(i in 1:nrow(params)) {
+  
+  set.seed(7)
+  
+  gbm.tune <- gbm(
+    formula = X1 ~ X3 + X4 + X5,
+    distribution = "gaussian",
+    data = health,
+    n.trees = 5000,
+    interaction.depth = params$interaction.depth[i],
+    shrinkage = params$shrinkage[i],
+    cv.folds = 53,
+    n.cores = NULL, 
+    verbose = FALSE
+  )
+  
+  # add min training error and trees to grid
+  params$optimal_trees[i] <- which.min(gbm.tune$cv.error)
+  params$min_MSE[i] <- min(gbm.tune$cv.error)
+}
+
+gbm.tune <- gbm(
+    formula = X1 ~ X3 + X4 + X5,
+    distribution = "gaussian",
+    data = health,
+    n.trees = 5000,
+    interaction.depth = 1,
+    shrinkage = .215,
+    #n.minobsinnode = 1,
+    cv.folds = 53,
+    n.cores = NULL, 
+    verbose = FALSE
+  )
+
+min(gbm.tune$valid.error)
+which.min(gbm.tune$valid.error)
+
+mean((health.test$X1 - predict(gbm.tune, health.test, n.trees = 9, type = "response")) ^ 2)
+
+predict(gbm.tune, health.test, n.trees = 9, type = "response")
+health.test$X1
+
+predErrors <- data.frame(matrix(ncol=1,nrow=53, dimnames=list(NULL, c("sqError"))))
+predErrors[,"sqError"] <- NA
+
+# Final Model and Loocv
+for(i in 1:nrow(health)){
+  
+  health.train <- health[-i,]
+  health.test <- health[i,]
+  
+  set.seed(7)
+  gbm.tune <- gbm(
+    formula = X1 ~ X3 + X4 + X5,
+    distribution = "gaussian",
+    data = health.train,
+    n.trees = 5000,
+    interaction.depth = 1,
+    shrinkage = .215,
+    cv.folds = 52,
+    n.cores = NULL, 
+    verbose = FALSE
+  )
+  
+ opt.trees <- which.min(gbm.tune$cv.error)
+ predErrors[i,"sqError"] <- (health.test$X1 - predict(gbm.tune, health.test, n.trees = opt.trees, type = "response")) ^ 2
+  
+}
+
+mean(predErrors$sqError)
+
+```
+
+This model seemed promising, but the effect outliers had on the model brought the test LOOCV MSE into a similar range as other models.
